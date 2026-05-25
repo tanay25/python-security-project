@@ -44,10 +44,7 @@ pipeline {
 
         stage('Bandit Scan') {
             steps {
-                sh '''
-                . $VENV/bin/activate
-                bandit -r .
-                '''
+                sh 'bandit -r . --exclude ./venv'
             }
         }
 
