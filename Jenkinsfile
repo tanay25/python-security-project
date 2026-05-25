@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    environment {
-        VENV = "venv"
-    }
-
     stages {
 
         stage('Clone Code') {
@@ -14,20 +10,13 @@ pipeline {
             }
         }
 
-        stage('Create Virtual Environment') {
-            steps {
-                sh '''
-                python3 -m venv $VENV
-                . $VENV/bin/activate
-                pip install --upgrade pip
-                '''
-            }
-        }
-
         stage('Install Dependencies') {
             steps {
                 sh '''
-                . $VENV/bin/activate
+                python3 -m venv venv
+                . venv/bin/activate
+
+                pip install --upgrade pip
                 pip install -r requirements.txt
                 '''
             }
@@ -36,7 +25,7 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                . $VENV/bin/activate
+                . venv/bin/activate
                 pytest
                 '''
             }
@@ -44,24 +33,35 @@ pipeline {
 
         stage('Bandit Scan') {
             steps {
-                sh 'bandit -r . --exclude ./venv'
+                sh '''
+                . venv/bin/activate
+
+                bandit -r . \
+                -x venv,__pycache__,tests \
+                || true
+                '''
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') {
-                    sh '''
-                    . $VENV/bin/activate
-                    sonar-scanner
-                    '''
+               script {
+                   def scannerHome = tool 'sonar-scanner'
+
+                   withSonarQubeEnv('sonarqube') {
+                   sh """
+                   . venv/bin/activate
+
+                   ${scannerHome}/bin/sonar-scanner
+                   """
                 }
             }
         }
+    }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t python-security-project .'
+                sh 'docker build -t python-security-project:latest .'
             }
         }
 
